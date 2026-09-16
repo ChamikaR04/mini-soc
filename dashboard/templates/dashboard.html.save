@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mini-soc — dashboard</title>
+
+  <link rel="stylesheet" href="../static/style.css">
+</head>
+
+<body>
+
+  <div class="shell">
+
+```
+<!-- Left icon rail -->
+<nav class="rail" aria-label="Sections">
+  <div class="rail-item active" title="Overview">OV</div>
+  <div class="rail-item" title="Events">EV</div>
+  <div class="rail-item" title="Alerts">AL</div>
+</nav>
+
+<!-- Top bar -->
+<header class="topbar">
+
+  <div class="system-name">
+    mini-soc <span>/ overview</span>
+  </div>
+
+  <div class="status-ticker">
+    <span>
+      <span class="dot"></span>
+      ingest ok
+    </span>
+
+    <span id="clock">--:--:--</span>
+  </div>
+
+</header>
+
+
+<!-- Main content -->
+<main class="main">
+
+
+  <!-- =====================================================
+       1. SUMMARY / KPI CARDS
+       Data source: /api/stats
+       ===================================================== -->
+
+  <section class="kpi-strip" id="kpi-strip">
+
+    <div class="kpi-tile">
+      <p class="kpi-label">Total Events</p>
+      <p class="kpi-value" id="kpi-total-events">—</p>
+    </div>
+
+    <div class="kpi-tile">
+      <p class="kpi-label">Total Alerts</p>
+      <p class="kpi-value" id="kpi-total-alerts">—</p>
+    </div>
+
+    <div class="kpi-tile">
+      <p class="kpi-label">High Severity Alerts</p>
+      <p class="kpi-value crit" id="kpi-high-alerts">—</p>
+    </div>
+
+    <div class="kpi-tile">
+      <p class="kpi-label">Open Alerts</p>
+      <p class="kpi-value warn" id="kpi-open-alerts">—</p>
+    </div>
+
+  </section>
+
+
+  <!-- =====================================================
+       2. RECENT SECURITY EVENTS
+       Data source: /api/events
+       ===================================================== -->
+
+  <section class="panel">
+
+    <div class="panel-header">
+
+      <h2>Recent Events</h2>
+
+      <span class="panel-meta">
+        last 20
+      </span>
+
+    </div>
+
+
+    <div class="data-table-wrap">
+
+      <table class="data-table">
+
+        <thead>
+
+          <tr>
+            <th>Time</th>
+            <th>Event</th>
+            <th>Source IP</th>
+            <th>User</th>
+            <th>Severity</th>
+            <th>Details</th>
+          </tr>
+
+        </thead>
+
+
+        <tbody id="events-body">
+
+          <tr class="empty-row">
+            <td colspan="6">
+              loading events…
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </section>
+
+
+
+  <!-- =====================================================
+       3. SECURITY ALERTS
+       Data source: /api/alerts
+       ===================================================== -->
+
+  <section class="panel">
+
+    <div class="panel-header">
+
+      <h2>Security Alerts</h2>
+
+      <span class="panel-meta" id="alerts-count-meta">
+        loading...
+      </span>
+
+    </div>
+
+
+    <div class="data-table-wrap">
+
+      <table class="data-table">
+
+        <thead>
+
+          <tr>
+            <th>Alert</th>
+            <th>Source</th>
+	    <th>Attempts</th>
+	    <th>First seen</th>
+	    <th>Last seen</th>
+            <th>Severity</th>
+            <th>Status</th>
+          </tr>
+
+        </thead>
+
+
+        <tbody id="alerts-body">
+
+          <tr class="empty-row">
+            <td colspan="6">
+              loading alerts…
+            </td>
+          </tr>
+
+        </tbody>
+
+      </table>
+
+    </div>
+
+  </section>
+
+
+</main>
+```
+
+  </div>
+
+  <!-- =========================================================
+       JAVASCRIPT
+       ========================================================= -->
+
+  <script>
+
+
+    /* =========================================================
+       CLOCK
+       ========================================================= */
+
+    function tick() {
+
+      const el = document.getElementById('clock');
+
+      if (el) {
+
+        el.textContent =
+          new Date().toTimeString().slice(0, 8);
+
+      }
+
+    }
+
+    tick();
+
+    setInterval(tick, 1000);
+
+
+
+    /* =========================================================
+       FORMAT TIMESTAMP
+       ========================================================= */
+
+    function fmtTime(ts) {
+
+      const d = new Date(ts);
+
+      if (isNaN(d.getTime())) {
+
+        return ts;
+
+      }
+
+      return d.toTimeString().slice(0, 8);
+
+    }
+
+
+
+    /* =========================================================
+       CONVERT EVENT TYPE TO DISPLAY NAME
+	========================================================*/
+    function eventLabel(eventType) {
+
+      if (!eventType) {
+
+        return 'Unknown';
+
+      }
+
+      return eventType
+
+        .split('_')
+
+        .map(word => {
+
+          if (word.toUpperCase() === 'SSH') {
+
+            return 'SSH';
+
+          }
+
+          return word.charAt(0).toUpperCase()
+               + word.slice(1);
+
+        })
+
+        .join(' ');
+
+    }
+
+
+
+    /* =========================================================
+       SEVERITY CSS CLASS
+       ========================================================= */
+
+    function sevClass(severity) {
+
+      return (severity || '').toLowerCase();
+
+    }
+
+
+
+    /* =========================================================
+       STATUS CSS CLASS
+       ========================================================= */
+
+    function statusClass(status) {
+
+      const s = (status || '').toLowerCase();
+
+      if (s === 'open') {
+
+        return 'open';
+
+      }
+
+      if (s === 'resolved') {
+
+        return 'resolved';
+
+      }
+
+      return 'ack';
+
+    }
+
+
+
+    /* =========================================================
+       1. LOAD DASHBOARD STATISTICS
+       
+       API:
+       /api/stats
+       ========================================================= */
+
+    async function loadStats() {
+
+      try {
+
+        const response =
+          await fetch('/api/stats');
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+        const data =
+          await response.json();
+
+
+        /*
+         * Flask currently returns:
+         *
+         * total_events
+         * total_alerts
+         * high_alerts
+         * open_alerts
+         */
+
+
+        document.getElementById(
+          'kpi-total-events'
+        ).textContent =
+          data.total_events ?? '—';
+
+
+        document.getElementById(
+          'kpi-total-alerts'
+        ).textContent =
+          data.total_alerts ?? '—';
+
+
+        document.getElementById(
+          'kpi-high-alerts'
+        ).textContent =
+          data.high_alerts ?? '—';
+
+
+        document.getElementById(
+          'kpi-open-alerts'
+        ).textContent =
+          data.open_alerts ?? '—';
+
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/stats:',
+          error
+        );
+
+      }
+
+    }
+
+
+
+    /* =========================================================
+       2. LOAD SECURITY EVENTS
+       
+       API:
+       /api/events
+       
+       Returns latest 20 events.
+       ========================================================= */
+
+    async function loadEvents() {
+
+      const tbody =
+        document.getElementById('events-body');
+
+
+      try {
+
+        const response =
+          await fetch('/api/events');
+
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+
+        const events =
+          await response.json();
+
+
+        /*
+         * No events
+         */
+
+        if (!events || events.length === 0) {
+
+          tbody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="6">
+                no events recorded
+              </td>
+            </tr>
+          `;
+
+          return;
+
+        }
+
+
+        /*
+         * Build table rows
+         */
+
+        tbody.innerHTML = events.map(event => `
+
+          <tr>
+
+            <td class="time">
+              ${fmtTime(event.timestamp)}
+            </td>
+
+            <td class="event-type">
+              ${eventLabel(event.event_type)}
+            </td>
+
+            <td class="ip">
+              ${event.source_ip || '—'}
+            </td>
+
+            <td>
+              ${event.username || '—'}
+            </td>
+
+            <td>
+
+              <span class="sev-badge ${sevClass(event.severity)}">
+
+                ${(event.severity || 'unknown').toUpperCase()}
+
+              </span>
+
+            </td>
+
+            <td class="message">
+              ${event.message || '—'}
+            </td>
+
+          </tr>
+
+        `).join('');
+
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/events:',
+          error
+        );
+
+
+        tbody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="6">
+              failed to load events
+            </td>
+          </tr>
+        `;
+
+      }
+
+    }
+
+
+
+    /* =========================================================       3. LOAD SECURITY ALERTS
+       
+       API:
+       /api/alerts
+       ========================================================= */
+
+    async function loadAlerts() {
+
+      const tbody =
+        document.getElementById('alerts-body');
+
+
+      try {
+
+        const response =
+          await fetch('/api/alerts');
+
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+
+        const alerts =
+          await response.json();
+
+
+        /*
+         * Update alert count
+         */
+
+        document.getElementById(
+          'alerts-count-meta'
+        ).textContent =
+          `${alerts.length} total`;
+
+
+        /*
+         * No alerts
+         */
+
+        if (!alerts || alerts.length === 0) {
+
+          tbody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="6">
+                no alerts generated
+              </td>
+            </tr>
+          `;
+
+          return;
+
+        }
+
+
+        /*
+         * Build alert rows
+         */
+
+        tbody.innerHTML = alerts.map(alert => `
+
+          <tr>
+
+            <td class="time">
+              ${eventLabel(alert.alert_type)}
+            </td>
+
+            <td class="alert-type">
+      	      ${alert.source_ip || '-'}
+            </td>
+
+            <td class="ip">
+              ${alert.attempt_count || '—'}
+            </td>
+
+	    <td class="message">
+	      ${alert.first_seen || '-'}
+            </td>
+	    <td class="message">
+	      ${alert.last_seen || '-'}
+	    </td>
+	    <td>
+
+              <span class="sev-badge ${sevClass(alert.severity)}">
+
+                ${(alert.severity || 'unknown').toUpperCase()}
+
+              </span>
+
+            </td>
+
+            <td>
+
+              <span class="status-badge ${statusClass(alert.status)}">
+
+                ${(alert.status || 'unknown').toUpperCase()}
+
+              </span>
+
+            </td>
+
+          </tr>
+
+        `).join('');
+
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/alerts:',
+          error
+        );
+
+
+        tbody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="6">
+              failed to load alerts
+            </td>
+          </tr>
+        `;
+
+      }
+
+    }
+
+
+    /*=========================================================
+	LOAD DDOS STATUS
+      =========================================================*/
+
+	async function loadDdosStatus(){
+		const container = document.getElementById('ddos-status-body');
+		const levelBadge = document.getElementBYId('ddos-threat-level');
+
+		try{
+			const response =await fetch('/api/ddos-status');
+			if(!response.ok) throw new Error('HTTP error ${response.status}');
+
+			const data = await response.json();
+
+			if(data.status == 'no_data'){
+				container.innerHTML = '<p>no data yet - is detector running? </p>;
+				levelBadge.textContent = 'no data';
+				return;
+			}
+
+			levelBadge.textContent = data.threat_level;
+			levelBadge.className = 'panel-meta' + sevClass(data.threat_level);
+
+
+			const topSourcesHTML = data.top_sources.length
+				?data.top_source.map(s=> '<li>${s.ip} - ${s.rate} pkt/sec</li>').join('')
+				:'<li>None</li>';
+			const alertsHtml = data.alearts.length
+				?data.alerts.map(a => '<li>${a}</li>').join('')
+				:'<li>None</li>';
+
+			container.innerHTML = '
+				<p>Total: ${data.rates.total} pkt/s | TCP: ${data.rates.tcp} | UDP: ${data.rates.udp} | ICMP : ${data.rates.icmp} | SYN: ${data.rates.syn}</p>
+				<p>Active source IPs: ${data.active_sources}</p>
+				<strong>Top Sources:</strong>
+				<ul>${topSourcesHtml}</ul>
+				<strong>Alerts:</strong>
+				<ul>$alersHtml}</ul>
+			':
+		} catch(error){
+			console.error("Failed to load /api/ddos-status:', error);
+			container.innerHTML= '<p>Failed to load network status</p>';
+		}
+	}
+	
+
+
+
+
+    /* =========================================================
+       REFRESH EVERYTHING
+       ========================================================= */
+
+    function refreshAll() {
+
+      loadStats();
+
+      loadEvents();
+
+      loadAlerts();
+
+      loadDdosStatus();	
+
+    }
+
+
+
+    /*
+     * Initial dashboard load
+     */
+
+    refreshAll();
+
+
+    /*
+     * Refresh every 5 seconds
+     *
+     * This gives you near-real-time dashboard updates.
+     */
+
+    setInterval(refreshAll, 5000);
+
+
+  </script>
+
+</body>
+</html>

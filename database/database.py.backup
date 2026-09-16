@@ -1,0 +1,66 @@
+import sqlite3
+from pathlib import Path
+
+DATABASE_PATH = Path(__file__).parent / "soc.db"
+
+def get_connection():
+    """Get a connection to the SQLite database."""
+    return sqlite3.connect(DATABASE_PATH)
+
+def initialize_database():
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            event_type TEXT NOT NULL,
+            source_ip TEXT,
+            username TEXT,
+            severity TEXT,
+            message TEXT
+            )
+        
+        """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS alerts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            timestamp TEXT NOT NULL,
+            alert_type TEXT NOT NULL,
+            source_ip TEXT,
+            severity TEXT NOT NULL,
+            description TEXT,
+            status TEXT DEFAULT 'open'
+        )
+    """)
+
+    connection.commit()
+    connection.close()
+
+
+def insert_event(timestamp, event_type, source_ip=None,
+                 username=None, severity=None, message=None):
+
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cursor.execute("""
+        INSERT INTO events
+        (timestamp, event_type, source_ip, username, severity, message)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, (
+        timestamp,
+        event_type,
+        source_ip,
+        username,
+        severity,
+        message
+    ))
+
+    connection.commit()
+    connection.close()
+
+if __name__ == "__main__":
+    initialize_database()
+    print("Database initialized successfully.")

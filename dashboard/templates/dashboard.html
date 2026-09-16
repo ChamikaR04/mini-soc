@@ -1,0 +1,1139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>mini-soc — dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+
+<body>
+
+  <div class="shell">
+
+<!-- =====================================================
+     LEFT NAVIGATION RAIL
+     ===================================================== -->
+
+<nav class="rail" aria-label="Sections">
+
+  <button type="button" class="rail-item active" id="nav-overview" title="Overview" onclick="showSection('overview')">
+    OV
+  </button>
+
+  <button type="button" class="rail-item" id="nav-ddos" title="DoS / DDoS Monitor" onclick="showSection('ddos')">
+    DS
+  </button>
+
+</nav>
+
+
+<!-- =====================================================
+     TOP BAR
+     ===================================================== -->
+
+<header class="topbar">
+
+  <div class="system-name">
+    mini-soc
+    <span id="page-title">/ overview</span>
+  </div>
+
+
+  <!-- ---------- SERVER SELECTOR ---------- -->
+
+  <div class="server-selector" id="server-selector" aria-label="Choose server">
+    <span class="server-selector-label">Server:</span>
+    <select
+      id="server-select"
+      class="server-select"
+      onchange="selectServer(this.value)"
+    >
+      <option value="">loading…</option>
+    </select>
+  </div>
+
+
+  <div class="status-ticker">
+    <span>
+      <span class="dot"></span>
+      ingest ok
+    </span>
+    <span id="clock">--:--:--</span>
+  </div>
+
+</header>
+
+
+<!-- =====================================================
+     MAIN
+     ===================================================== -->
+
+<main class="main">
+
+
+  <!-- =====================================================
+       OVERVIEW SECTION
+       ===================================================== -->
+
+  <div id="overview-section" class="dashboard-section active-section">
+
+    <section class="kpi-strip">
+
+      <div class="kpi-tile">
+        <p class="kpi-label">Total Events</p>
+        <p class="kpi-value" id="kpi-total-events">—</p>
+      </div>
+
+      <div class="kpi-tile">
+        <p class="kpi-label">Total Alerts</p>
+        <p class="kpi-value" id="kpi-total-alerts">—</p>
+      </div>
+
+      <div class="kpi-tile">
+        <p class="kpi-label">High Severity Alerts</p>
+        <p class="kpi-value crit" id="kpi-high-alerts">—</p>
+      </div>
+
+      <div class="kpi-tile">
+        <p class="kpi-label">Open Alerts</p>
+        <p class="kpi-value warn" id="kpi-open-alerts">—</p>
+      </div>
+
+    </section>
+
+
+    <!-- ---------- RECENT EVENTS ---------- -->
+
+    <section class="panel" id="events">
+
+      <div class="panel-header">
+        <h2>Recent Events</h2>
+        <span class="panel-meta" id="events-server-meta">last 20</span>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Time</th>
+              <th>Event</th>
+              <th>Source IP</th>
+              <th>User</th>
+              <th>Severity</th>
+              <th>Details</th>
+            </tr>
+          </thead>
+          <tbody id="events-body">
+            <tr class="empty-row">
+              <td colspan="6">loading events…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+
+    <!-- ---------- SECURITY ALERTS ---------- -->
+
+    <section class="panel" id="alerts">
+
+      <div class="panel-header">
+        <h2>Security Alerts</h2>
+        <span class="panel-meta" id="alerts-count-meta">loading...</span>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Alert</th>
+              <th>Source</th>
+              <th>Attempts</th>
+              <th>First seen</th>
+              <th>Last seen</th>
+              <th>Severity</th>
+              <th>Status</th>
+            </tr>
+          </thead>
+          <tbody id="alerts-body">
+            <tr class="empty-row">
+              <td colspan="7">loading alerts…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+  </div>
+
+
+  <!-- =====================================================
+       DOS / DDOS MONITOR SECTION
+       ===================================================== -->
+
+  <div id="ddos-section" class="dashboard-section">
+
+    <section class="kpi-strip" id="ddos-kpi-strip">
+
+      <div class="kpi-tile">
+        <p class="kpi-label">Threat Level</p>
+        <p class="kpi-value" id="ddos-threat-level">—</p>
+      </div>
+
+      <div class="kpi-tile">
+        <p class="kpi-label">Total pkt/sec</p>
+        <p class="kpi-value" id="ddos-total-rate">—</p>
+      </div>
+
+      <div class="kpi-tile">
+        <p class="kpi-label">SYN pkt/sec</p>
+        <p class="kpi-value warn" id="ddos-syn-rate">—</p>
+      </div>
+
+      <div class="kpi-tile">
+        <p class="kpi-label">Active Source IPs</p>
+        <p class="kpi-value" id="ddos-active-sources">—</p>
+      </div>
+
+    </section>
+
+
+    <!-- ---------- PACKET RATE GRAPH ---------- -->
+
+    <section class="panel ddos-traffic-panel">
+
+      <div class="panel-header">
+        <h2>Packet Rate</h2>
+        <span class="panel-meta" id="ddos-last-updated">—</span>
+      </div>
+
+      <div class="traffic-chart-area">
+
+        <div class="traffic-chart-header">
+
+          <div class="traffic-legend">
+            <span class="legend-item"><span class="legend-dot tcp"></span>TCP</span>
+            <span class="legend-item"><span class="legend-dot udp"></span>UDP</span>
+            <span class="legend-item"><span class="legend-dot icmp"></span>ICMP</span>
+          </div>
+
+          <div class="traffic-live">
+            <span class="live-dot"></span>
+            LIVE
+          </div>
+
+        </div>
+
+        <div class="traffic-chart">
+
+          <svg id="ddos-chart" viewBox="0 0 1000 320" preserveAspectRatio="none" aria-label="Live packet rate chart">
+            <g class="chart-grid">
+              <line x1="0" y1="40" x2="1000" y2="40"></line>
+              <line x1="0" y1="100" x2="1000" y2="100"></line>
+              <line x1="0" y1="160" x2="1000" y2="160"></line>
+              <line x1="0" y1="220" x2="1000" y2="220"></line>
+              <line x1="0" y1="280" x2="1000" y2="280"></line>
+            </g>
+            <path id="tcp-line" class="chart-line tcp-line" d=""></path>
+            <path id="udp-line" class="chart-line udp-line" d=""></path>
+            <path id="icmp-line" class="chart-line icmp-line" d=""></path>
+          </svg>
+
+          <div id="ddos-chart-empty" class="chart-empty">waiting for traffic data…</div>
+
+        </div>
+
+        <div class="traffic-current-values">
+
+          <div class="traffic-value">
+            <span class="traffic-value-label">TCP</span>
+            <strong id="chart-tcp-value">—</strong>
+            <span>pkt/s</span>
+          </div>
+
+          <div class="traffic-value">
+            <span class="traffic-value-label">UDP</span>
+            <strong id="chart-udp-value">—</strong>
+            <span>pkt/s</span>
+          </div>
+
+          <div class="traffic-value">
+            <span class="traffic-value-label">ICMP</span>
+            <strong id="chart-icmp-value">—</strong>
+            <span>pkt/s</span>
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+
+
+    <!-- ---------- TOP SOURCE IPS ---------- -->
+
+    <section class="panel">
+
+      <div class="panel-header">
+        <h2>Top Source IPs</h2>
+        <span class="panel-meta">this interval</span>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Source IP</th>
+              <th>Rate (pkt/sec)</th>
+            </tr>
+          </thead>
+          <tbody id="ddos-top-sources-body">
+            <tr class="empty-row">
+              <td colspan="2">loading top sources…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+
+    <!-- ---------- SUSPICIOUS SOURCES ---------- -->
+
+    <section class="panel">
+
+      <div class="panel-header">
+        <h2>Suspicious Sources</h2>
+        <span class="panel-meta" id="ddos-suspicious-count-meta">loading...</span>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Source IP</th>
+              <th>Rate (pkt/sec)</th>
+            </tr>
+          </thead>
+          <tbody id="ddos-suspicious-body">
+            <tr class="empty-row">
+              <td colspan="2">loading suspicious sources…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+
+    <!-- ---------- THREAT ALERTS ---------- -->
+
+    <section class="panel">
+
+      <div class="panel-header">
+        <h2>Threat Alerts</h2>
+        <span class="panel-meta" id="ddos-alerts-count-meta">loading...</span>
+      </div>
+
+      <div class="data-table-wrap">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Alert</th>
+            </tr>
+          </thead>
+          <tbody id="ddos-alerts-body">
+            <tr class="empty-row">
+              <td colspan="1">loading alerts…</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+    </section>
+
+  </div>
+
+</main>
+
+  </div>
+
+  <!-- =========================================================
+       JAVASCRIPT
+       ========================================================= -->
+
+  <script>
+
+
+    /* =========================================================
+       CURRENTLY SELECTED SERVER
+       ========================================================= */
+
+    let currentServer = 'central';
+
+
+
+    /* =========================================================
+       LOAD SERVER LIST AND BUILD THE DROPDOWN
+       ========================================================= */
+
+    async function loadServerList() {
+
+      const select =
+        document.getElementById('server-select');
+
+      try {
+
+        const response =
+          await fetch('/api/servers');
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+        const servers =
+          await response.json();
+
+        if (!servers || servers.length === 0) {
+
+          select.innerHTML =
+            '<option value="">no servers yet</option>';
+
+          return;
+
+        }
+
+        if (!servers.includes(currentServer)) {
+          currentServer = servers[0];
+        }
+
+        select.innerHTML = servers.map(server => `
+          <option value="${server}" ${server === currentServer ? 'selected' : ''}>
+            ${server}
+          </option>
+        `).join('');
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/servers:',
+          error
+        );
+
+        select.innerHTML =
+          '<option value="">failed to load servers</option>';
+
+      }
+
+    }
+
+
+
+    /* =========================================================
+       HANDLE SERVER SELECTION
+       ========================================================= */
+
+    function selectServer(server) {
+
+      if (!server) {
+        return;
+      }
+
+      currentServer = server;
+      refreshAll();
+
+    }
+
+
+
+    /* =========================================================
+       SECTION NAVIGATION
+       ========================================================= */
+
+    function showSection(section) {
+
+      const overviewSection = document.getElementById('overview-section');
+      const ddosSection = document.getElementById('ddos-section');
+      const overviewButton = document.getElementById('nav-overview');
+      const ddosButton = document.getElementById('nav-ddos');
+      const pageTitle = document.getElementById('page-title');
+
+      if (section === 'overview') {
+
+        overviewSection.classList.add('active-section');
+        ddosSection.classList.remove('active-section');
+        overviewButton.classList.add('active');
+        ddosButton.classList.remove('active');
+        pageTitle.textContent = '/ overview';
+
+      }
+
+      if (section === 'ddos') {
+
+        ddosSection.classList.add('active-section');
+        overviewSection.classList.remove('active-section');
+        ddosButton.classList.add('active');
+        overviewButton.classList.remove('active');
+        pageTitle.textContent = '/ dos monitor';
+
+      }
+
+    }
+
+
+
+    /* =========================================================
+       CLOCK
+       ========================================================= */
+
+    function tick() {
+
+      const el = document.getElementById('clock');
+
+      if (el) {
+        el.textContent = new Date().toTimeString().slice(0, 8);
+      }
+
+    }
+
+    tick();
+    setInterval(tick, 1000);
+
+
+
+    /* =========================================================
+       OVERVIEW - LOAD STATS
+       ========================================================= */
+
+    async function loadStats() {
+
+      try {
+
+        const response =
+          await fetch(`/api/stats?server=${encodeURIComponent(currentServer)}`);
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+        const data =
+          await response.json();
+
+        document.getElementById('kpi-total-events').textContent =
+          data.total_events ?? '—';
+
+        document.getElementById('kpi-total-alerts').textContent =
+          data.total_alerts ?? '—';
+
+        document.getElementById('kpi-high-alerts').textContent =
+          data.high_alerts ?? '—';
+
+        document.getElementById('kpi-open-alerts').textContent =
+          data.open_alerts ?? '—';
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/stats:',
+          error
+        );
+
+      }
+
+    }
+
+
+
+    /* =========================================================
+       OVERVIEW - LOAD EVENTS
+       ========================================================= */
+
+    async function loadEvents() {
+
+      const tbody = document.getElementById('events-body');
+
+      const meta = document.getElementById('events-server-meta');
+      if (meta) {
+        meta.textContent = `last 20 — ${currentServer}`;
+      }
+
+      try {
+
+        const response =
+          await fetch(`/api/events?server=${encodeURIComponent(currentServer)}`);
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+        const events =
+          await response.json();
+
+        if (!events || events.length === 0) {
+
+          tbody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="6">no events recorded for ${currentServer}</td>
+            </tr>
+          `;
+
+          return;
+
+        }
+
+        tbody.innerHTML = events.map(event => `
+          <tr>
+            <td class="time">${fmtTime(event.timestamp)}</td>
+            <td class="event-type">${eventLabel(event.event_type)}</td>
+            <td class="ip">${event.source_ip || '—'}</td>
+            <td>${event.username || '—'}</td>
+            <td>
+              <span class="sev-badge ${sevClass(event.severity)}">
+                ${(event.severity || 'unknown').toUpperCase()}
+              </span>
+            </td>
+            <td class="message">${event.message || '—'}</td>
+          </tr>
+        `).join('');
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/events:',
+          error
+        );
+
+        tbody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="6">failed to load events</td>
+          </tr>
+        `;
+
+      }
+
+    }
+
+
+
+    /* =========================================================
+       OVERVIEW - LOAD ALERTS
+       ========================================================= */
+
+    async function loadAlerts() {
+
+      const tbody = document.getElementById('alerts-body');
+
+      try {
+
+        const response =
+          await fetch(`/api/alerts?server=${encodeURIComponent(currentServer)}`);
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+        const alerts =
+          await response.json();
+
+        document.getElementById('alerts-count-meta').textContent =
+          `${alerts.length} total — ${currentServer}`;
+
+        if (!alerts || alerts.length === 0) {
+
+          tbody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="7">no alerts generated for ${currentServer}</td>
+            </tr>
+          `;
+
+          return;
+
+        }
+
+        tbody.innerHTML = alerts.map(alert => `
+          <tr>
+            <td class="alert-type">${eventLabel(alert.alert_type)}</td>
+            <td class="ip">${alert.source_ip || '—'}</td>
+            <td>${alert.attempt_count || '—'}</td>
+            <td class="message">${alert.first_seen || '—'}</td>
+            <td class="message">${alert.last_seen || '—'}</td>
+            <td>
+              <span class="sev-badge ${sevClass(alert.severity)}">
+                ${(alert.severity || 'unknown').toUpperCase()}
+              </span>
+            </td>
+            <td>
+              <span class="status-badge ${statusClass(alert.status)}">
+                ${(alert.status || 'unknown').toUpperCase()}
+              </span>
+            </td>
+          </tr>
+        `).join('');
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/alerts:',
+          error
+        );
+
+        tbody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="7">failed to load alerts</td>
+          </tr>
+        `;
+
+      }
+
+    }
+
+
+
+    /* =========================================================
+       DDOS - THREAT CLASS
+       ========================================================= */
+
+    function threatClass(level) {
+
+      const l = (level || '').toLowerCase();
+
+      if (l === 'normal') return 'low';
+      if (l === 'warning') return 'medium';
+      if (l === 'critical' || l === 'high') return 'high';
+
+      return '';
+
+    }
+
+
+
+    /* =========================================================
+       DDOS - LIVE GRAPH HISTORY (per server)
+       ========================================================= */
+
+    const ddosChartHistoryByServer = {};
+
+    const DDOS_CHART_POINTS = 30;
+
+
+    function getChartHistory(server) {
+
+      if (!ddosChartHistoryByServer[server]) {
+
+        ddosChartHistoryByServer[server] = {
+          tcp: [],
+          udp: [],
+          icmp: []
+        };
+
+      }
+
+      return ddosChartHistoryByServer[server];
+
+    }
+
+
+    function addDdosChartPoint(server, tcp, udp, icmp) {
+
+      const history = getChartHistory(server);
+
+      history.tcp.push(Number(tcp) || 0);
+      history.udp.push(Number(udp) || 0);
+      history.icmp.push(Number(icmp) || 0);
+
+      if (history.tcp.length > DDOS_CHART_POINTS) {
+        history.tcp.shift();
+        history.udp.shift();
+        history.icmp.shift();
+      }
+
+      drawDdosChart(server);
+
+    }
+
+
+    function createChartPath(values, maxValue) {
+
+      if (!values || values.length === 0) {
+        return '';
+      }
+
+      const width = 1000;
+      const height = 320;
+      const paddingX = 10;
+      const paddingY = 30;
+
+      const usableWidth = width - (paddingX * 2);
+      const usableHeight = height - (paddingY * 2);
+
+      const step =
+        values.length === 1
+          ? 0
+          : usableWidth / (values.length - 1);
+
+      return values.map((value, index) => {
+
+        const x = paddingX + (index * step);
+        const normalized = maxValue === 0 ? 0 : value / maxValue;
+        const y = height - paddingY - (normalized * usableHeight);
+
+        return index === 0 ? `M ${x} ${y}` : `L ${x} ${y}`;
+
+      }).join(' ');
+
+    }
+
+
+    function drawDdosChart(server) {
+
+      const history = getChartHistory(server);
+
+      const allValues = [
+        ...history.tcp,
+        ...history.udp,
+        ...history.icmp
+      ];
+
+      if (allValues.length === 0) {
+        return;
+      }
+
+      const maxValue = Math.max(...allValues, 1);
+      const graphMax = Math.max(10, Math.ceil(maxValue * 1.15));
+
+      document.getElementById('tcp-line').setAttribute(
+        'd', createChartPath(history.tcp, graphMax)
+      );
+
+      document.getElementById('udp-line').setAttribute(
+        'd', createChartPath(history.udp, graphMax)
+      );
+
+      document.getElementById('icmp-line').setAttribute(
+        'd', createChartPath(history.icmp, graphMax)
+      );
+
+      const empty = document.getElementById('ddos-chart-empty');
+      if (empty) {
+        empty.style.display = 'none';
+      }
+
+    }
+
+
+    function updateDdosChartValues(tcp, udp, icmp) {
+
+      document.getElementById('chart-tcp-value').textContent =
+        Number(tcp || 0).toLocaleString();
+
+      document.getElementById('chart-udp-value').textContent =
+        Number(udp || 0).toLocaleString();
+
+      document.getElementById('chart-icmp-value').textContent =
+        Number(icmp || 0).toLocaleString();
+
+    }
+
+
+
+    /* =========================================================
+       DDOS - LOAD STATUS
+       ========================================================= */
+
+    async function loadDdosStatus() {
+
+      const threatBadge = document.getElementById('ddos-threat-level');
+      const totalRateEl = document.getElementById('ddos-total-rate');
+      const synRateEl = document.getElementById('ddos-syn-rate');
+      const activeSourcesEl = document.getElementById('ddos-active-sources');
+      const lastUpdatedEl = document.getElementById('ddos-last-updated');
+      const topSourcesBody = document.getElementById('ddos-top-sources-body');
+      const suspiciousBody = document.getElementById('ddos-suspicious-body');
+      const suspiciousMeta = document.getElementById('ddos-suspicious-count-meta');
+      const alertsBody = document.getElementById('ddos-alerts-body');
+      const alertsMeta = document.getElementById('ddos-alerts-count-meta');
+
+      try {
+
+        const response =
+          await fetch(
+            `/api/ddos-status?server=${encodeURIComponent(currentServer)}`,
+            { cache: 'no-store' }
+          );
+
+        if (!response.ok) {
+
+          throw new Error(
+            `HTTP error ${response.status}`
+          );
+
+        }
+
+        const data =
+          await response.json();
+
+
+        if (data.status === 'no_data') {
+
+          threatBadge.textContent = 'NO DATA';
+          threatBadge.className = 'kpi-value';
+          totalRateEl.textContent = '—';
+          synRateEl.textContent = '—';
+          activeSourcesEl.textContent = '—';
+          lastUpdatedEl.textContent = `${currentServer}: detector not running?`;
+
+          document.getElementById('chart-tcp-value').textContent = '—';
+          document.getElementById('chart-udp-value').textContent = '—';
+          document.getElementById('chart-icmp-value').textContent = '—';
+          document.getElementById('ddos-chart-empty').style.display = 'flex';
+
+          return;
+
+        }
+
+
+        const rates = data.rates || {};
+        const tcpRate = Number(rates.tcp || 0);
+        const udpRate = Number(rates.udp || 0);
+        const icmpRate = Number(rates.icmp || 0);
+        const totalRate = Number(rates.total || 0);
+        const synRate = Number(rates.syn || 0);
+
+        const topSources = Array.isArray(data.top_sources) ? data.top_sources : [];
+        const suspiciousSources = Array.isArray(data.suspicious_sources) ? data.suspicious_sources : [];
+        const alerts = Array.isArray(data.alerts) ? data.alerts : [];
+
+        const threatLevel = data.threat_level || 'UNKNOWN';
+
+        threatBadge.textContent = threatLevel;
+        threatBadge.className = 'kpi-value ' + threatClass(threatLevel);
+
+        totalRateEl.textContent = totalRate.toLocaleString();
+        synRateEl.textContent = synRate.toLocaleString();
+        activeSourcesEl.textContent = data.active_sources ?? 0;
+
+        if (data.timestamp) {
+          lastUpdatedEl.textContent =
+            `${currentServer} — updated ${fmtClockTime(data.timestamp)}`;
+        }
+
+        addDdosChartPoint(currentServer, tcpRate, udpRate, icmpRate);
+        updateDdosChartValues(tcpRate, udpRate, icmpRate);
+
+
+        if (topSources.length === 0) {
+
+          topSourcesBody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="2">no source traffic this interval</td>
+            </tr>
+          `;
+
+        } else {
+
+          topSourcesBody.innerHTML = topSources.map(source => `
+            <tr>
+              <td class="ip">${source.ip || '—'}</td>
+              <td>${Number(source.rate || 0).toLocaleString()}</td>
+            </tr>
+          `).join('');
+
+        }
+
+
+        suspiciousMeta.textContent = `${suspiciousSources.length} flagged`;
+
+        if (suspiciousSources.length === 0) {
+
+          suspiciousBody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="2">none detected</td>
+            </tr>
+          `;
+
+        } else {
+
+          suspiciousBody.innerHTML = suspiciousSources.map(source => `
+            <tr>
+              <td class="ip">${source.ip || '—'}</td>
+              <td>
+                <span class="sev-badge medium">
+                  ${Number(source.rate || 0).toLocaleString()}
+                </span>
+              </td>
+            </tr>
+          `).join('');
+
+        }
+
+
+        alertsMeta.textContent = `${alerts.length} active`;
+
+        if (alerts.length === 0) {
+
+          alertsBody.innerHTML = `
+            <tr class="empty-row">
+              <td colspan="1">no active threat alerts</td>
+            </tr>
+          `;
+
+        } else {
+
+          alertsBody.innerHTML = alerts.map(alert => `
+            <tr>
+              <td>
+                <span class="sev-badge ${threatClass(threatLevel)}">
+                  ${alert}
+                </span>
+              </td>
+            </tr>
+          `).join('');
+
+        }
+
+
+      } catch (error) {
+
+        console.error(
+          'Failed to load /api/ddos-status:',
+          error
+        );
+
+        threatBadge.textContent = 'ERROR';
+        threatBadge.className = 'kpi-value high';
+        lastUpdatedEl.textContent = 'failed to load';
+
+        topSourcesBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="2">failed to load</td>
+          </tr>
+        `;
+
+        suspiciousBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="2">failed to load</td>
+          </tr>
+        `;
+
+        alertsBody.innerHTML = `
+          <tr class="empty-row">
+            <td colspan="1">failed to load</td>
+          </tr>
+        `;
+
+      }
+
+    }
+
+
+
+    /* =========================================================
+       FORMAT HELPERS
+       ========================================================= */
+
+    function fmtTime(ts) {
+
+      const d = new Date(ts);
+
+      if (isNaN(d.getTime())) {
+        return ts;
+      }
+
+      return d.toTimeString().slice(0, 8);
+
+    }
+
+
+    function fmtClockTime(ts) {
+      return fmtTime(ts);
+    }
+
+
+    function eventLabel(eventType) {
+
+      if (!eventType) {
+        return 'Unknown';
+      }
+
+      return eventType
+        .split('_')
+        .map(word => {
+
+          if (word.toUpperCase() === 'SSH') {
+            return 'SSH';
+          }
+
+          return word.charAt(0).toUpperCase() + word.slice(1);
+
+        })
+        .join(' ');
+
+    }
+
+
+    function sevClass(severity) {
+      return (severity || '').toLowerCase();
+    }
+
+
+    function statusClass(status) {
+
+      const s = (status || '').toLowerCase();
+
+      if (s === 'open') return 'open';
+      if (s === 'resolved') return 'resolved';
+
+      return 'ack';
+
+    }
+
+
+
+    /* =========================================================
+       INITIAL LOAD + REFRESH LOOP
+       ========================================================= */
+
+    function refreshAll() {
+
+      loadStats();
+      loadEvents();
+      loadAlerts();
+      loadDdosStatus();
+
+    }
+
+
+    loadServerList().then(refreshAll);
+
+
+    setInterval(() => {
+
+      loadServerList();
+      refreshAll();
+
+    }, 5000);
+
+
+  </script>
+
+</body>
+</html>

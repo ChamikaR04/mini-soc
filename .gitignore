@@ -1,0 +1,39 @@
+# Python virtual environment
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.py[cod]
+
+# Databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Runtime/generated data
+Dos_Data/traffic.db
+Dos_Data/ddos_status.json
+Dos_Data/servers/*.json
+
+# Environment/secrets
+.env
+.env.*
+*.key
+*.pem
+*.crt
+secrets/
+credentials/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db

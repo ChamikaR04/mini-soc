@@ -1,0 +1,36 @@
+import re 
+import subprocess
+
+from datetime import datetime
+
+from database.database import insert_event
+from detector.detection_engine import detect_ssh_bruteforce
+
+
+def parse_ssh_log(log_line):
+	""" 
+	Phrase an SSH authentication log line.
+
+	Returns a dictionary containing the security event, 
+	or None if the line is not an SSH authentication event.
+	"""
+
+	#dailed password
+	match = re.search(
+		r"Failed password for(?:invalid user )?(\S+) from (\S+)",
+		log_line
+	)
+
+	if match:
+		username = match.group(1)
+		source_ip = match.group(2)
+
+		return{
+			"event_type": "ssh_failed_login",
+			"source_ip": source_ip,
+			"username": username,
+			"severity": "medium",
+			"message": log_line.strip()
+		}
+
+			

@@ -1,0 +1,95 @@
+from datetime import datetime, timedelta
+
+from database.database import get_connection
+
+
+FAILED_LOGIN_THRESHOLD = 5
+TIME_WINDOW_MINUTES = 2
+
+
+def detect_ssh_bruteforce(source_ip):
+    connection = get_connection()
+    cursor = connection.cursor()
+
+    cutoff_time = (
+        datetime.now() - timedelta(minutes=TIME_WINDOW_MINUTES)
+    ).isoformat(timespec="seconds")
+
+    cursor.execute("""
+        SELECT COUNT(*)
+        FROM events
+        WHERE event_type = 'ssh_failed_login'
+        AND source_ip = ?
+        AND timestamp >= ?
+    """, (source_ip, cutoff_time))
+
+    failed_attempts = cursor.fetchone()[0]
+
+    if failed_attempts >= FAILED_LOGIN_THRESHOLD:
+
+        # Prevent duplicate alerts for the same attack
+        cursor.execute("""
+            SELECT id
+            FROM alerts
+            WHERE alert_type = 'ssh_bruteforce'
+            AND source_ip = ?
+            AND status = 'open'
+            ORDER BY id DESC
+            LIMIT 1
+        """, (source_ip,))
+
+        existing_alert = cursor.fetchone()
+
+        if existing_alert:
+            connection.close()
+            return None
+
+        description = (
+            f"{failed_attempts} failed SSH login attempts "
+            f"detected from {source_ip} within "
+            f"{TIME_WINDOW_MINUTES} minutes."
+        )
+
+        timestamp = datetime.now().isoformat(timespec="seconds")
+
+        cursor.execute("""
+            INSERT INTO alerts
+            (timestamp, alert_type, source_ip, severity, description, status)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (
+            timestamp,
+            "ssh_bruteforce",
+            source_ip,
+            "high",
+            description,
+            "open"
+        ))
+
+        connection.commit()
+        connection.close()
+
+        return {
+            "alert_type": "ssh_bruteforce",
+            "source_ip": source_ip,
+            "severity": "high",
+            "description": description
+        }
+
+    connection.close()
+    return None
+
+
+if __name__ == "__main__":
+
+    test_ip = "192.168.1.50"
+
+    alert = detect_ssh_bruteforce(test_ip)
+
+    if alert:
+        print("🚨 SECURITY ALERT")
+        print(f"Type: {alert['alert_type']}")
+        print(f"Source IP: {alert['source_ip']}")
+        print(f"Severity: {alert['severity']}")
+        print(f"Description: {alert['description']}")
+    else:
+        print("No new brute-force alert detected.")
