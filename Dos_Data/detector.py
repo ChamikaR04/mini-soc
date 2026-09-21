@@ -43,7 +43,8 @@ DB_PATH = "/opt/mini-soc/Dos_Data/traffic.db"
 # Kept for backwards compatibility / quick external tools
 # that might still want the plain JSON snapshot.
 RESULT_PATH = "/opt/mini-soc/Dos_Data/ddos_status.json"
-
+DDOS_SERVERS_DIR = "/opt/mini-soc/Dos_Data/servers"
+SERVER_LABEL = "central"
 
 # ============================================================
 # DETECTION THRESHOLDS
@@ -204,7 +205,14 @@ def write_result_json(result):
         json.dump(result, f, indent=2)
 
     os.replace(tmp_path, RESULT_PATH)
+    os.makedirs(DDOS_SERVERS_DIR, exist_ok=True)
+    server_path = os.path.join(DDOS_SERVERS_DIR, f"{SERVER_LABEL}.json")
+    server_tmp_path = server_path + ".tmp"
 
+    with open(server_tmp_path, "w") as f:
+        json.dump(result, f, indent=2)
+
+    os.replace(server_tmp_path, server_path)
 
 # ============================================================
 # PROCESS PACKETS
